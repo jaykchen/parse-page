@@ -10,13 +10,13 @@ use headless_chrome::{
     protocol::cdp::Page::CaptureScreenshotFormatOption, types::PrintToPdfOptions, Browser,
     LaunchOptions,
 };
+use poppler::PopplerDocument;
+use poppler::PopplerPage;
 use reqwest::header::HeaderMap;
 use reqwest::Client;
 use std::fs;
 use tokio::sync::mpsc::{self, Sender};
 use url::Url;
-use poppler::PopplerDocument;
-use poppler::PopplerPage;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -28,73 +28,59 @@ async fn main() -> Result<()> {
 
     let browser = Browser::new(options)?;
 
+    let url = "https://www.theverge.com/";
     let url = "https://github.com/amiiiiii830?tab=repositories";
-    let url = "https://www.theverge.com/2023/5/16/23726119/congress-ai-hearing-sam-altman-openai";
+    let url = "https://github.com/Cormanz/smartgpt";
+    let url = "https://github.com/Cormanz/smartgpt/tree/main/src";
     // let url = "https://www.wsj.com/articles/the-return-to-the-office-has-stalled-e0af9741?mod=hp_lead_pos1";
 
     let tab = browser.new_tab()?;
     tab.set_default_timeout(std::time::Duration::from_secs(10));
     tab.navigate_to(url)?;
 
-    // tab.wait_for_element_with_custom_timeout(
-    //     ".js-details-container",
-    //     std::time::Duration::from_secs(10),
-    // )?;
-
     let html = tab.get_content()?;
 
-    let base_url = Url::parse("https://github.com/").unwrap();
     let base_url = Url::parse("https://www.theverge.com/").unwrap();
+    let base_url = Url::parse("https://github.com/").unwrap();
     // let base_url = Url::parse("https://online.wsj.com/").unwrap();
-    // let jpeg_data =
-    //     tab.capture_screenshot(CaptureScreenshotFormatOption::Jpeg, Some(75), None, true)?;
-    // fs::write("screenshot.verge.jpg", jpeg_data)?;
 
     let pdf_options: Option<PrintToPdfOptions> = Some(PrintToPdfOptions {
         landscape: Some(false),
         display_header_footer: Some(false),
         print_background: Some(false),
+        scale: Some(0.5),
         paper_width: Some(11.0),
         paper_height: Some(17.0),
+        margin_top: Some(0.1),
+        margin_bottom: Some(0.1),
+        margin_left: Some(0.1),
+        margin_right: Some(0.1),
+        page_ranges: Some("1-2".to_string()),
         ignore_invalid_page_ranges: Some(true),
         prefer_css_page_size: Some(false),
         transfer_mode: None,
         ..Default::default()
     });
 
-    //  Some(PrintToPdfOptions {
-    //      landscape: Some(false),
-    //      display_header_footer: Some(false),
-    //      print_background: Some(false),
-    //      paper_width: Some(279.0),
-    //      paper_height: Some(432.0),
-    //      ignore_invalid_page_ranges: Some(true),
-    //      prefer_css_page_size: Some(false),
-    //      transfer_mode: None,  // Option<TransferMode>,      Some(Page::PrintToPDFTransfer_modeOption::ReturnAsBase64) // Some(Page::PrintToPDFTransfer_modeOption::ReturnAsStream)
-    //      ..Default::default()
-    // });
+    let pdf_data = tab.print_to_pdf(pdf_options)?;
 
-    let local_pdf = tab.print_to_pdf(pdf_options)?;
+    fs::write("github.pdf", pdf_data.clone())?;
 
-    fs::write("story.verge.pdf", local_pdf.clone())?;
+    let mut pdf_as_vec = pdf_data.to_vec();
 
-    let mut page_pdf = local_pdf.to_vec();
-
-    let doc = PopplerDocument::new_from_data(&mut page_pdf, "")?;
+    let doc = PopplerDocument::new_from_data(&mut pdf_as_vec, "")?;
 
     let page = doc.get_page(0).unwrap();
-    let content = page.get_text ().unwrap();
+    let content = page.get_text().unwrap();
 
-    println!("page {:?}", doc ());
-    println!("-------------------------------");
     println!("page {:?}", content);
 
-    fs::write("raw.verge.html", html.clone())?;
+    fs::write("raw.github.html", html.clone())?;
 
     extract_readability(
         html,
         Some(base_url.to_string()),
-        Some(PathBuf::from("clean.verge.html")),
+        Some(PathBuf::from("clean.github.html")),
     )
     .await;
     // println!("{:?}", extracted_content.);
